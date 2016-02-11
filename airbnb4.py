@@ -65,8 +65,6 @@ for it, row in raw_train.iterrows():
                   'affiliate_provider': 'unknown'  if (str(row['affiliate_provider']) == 'nan') else row['affiliate_provider'],
                   'first_affiliate_tracked': 'unknown' if (str(row['first_affiliate_tracked']) == 'nan') else row['first_affiliate_tracked'],
                   'signup_app': 'unknown' if (str(row['signup_app']) == 'nan') else row['signup_app'],
-                  'first_device_type': 'unknown' if (str(row['first_device_type']) == 'nan') else row['first_device_type'],
-                  'first_browser': 'unknown' if (str(row['first_browser']) == 'nan') else row['first_browser'],
                   'month_first_booking': 'unknown' if (str(row['date_first_booking']) == 'nan') else str(parse(row['date_first_booking']).month) 
                   }
     X.append(data_point)
@@ -102,23 +100,50 @@ def build_model(input_dim, output_dim, hn=64, dp=0.5, layers=1):
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
 
-EPOCHS = 16
-BATCHES = 128
+EPOCHS = 4
+BATCHES = 256
 HN = 512
 RUN_FOLDS = False
 nb_folds = 4
 kfolds = KFold(len(y), nb_folds)
 av_ll = 0.
 f = 0
-LAYERS  = 2
+LAYERS  = 1
 dp = 0.5
+
+
 
 print("Generating submission...")
 
-model = build_model(input_dim, output_dim, HN, dp, LAYERS)
+model = build_model(input_dim, output_dim, HN)
 model.fit(X, Y, nb_epoch=EPOCHS, batch_size=BATCHES, verbose=0)
 
 raw_train = pandas.read_csv("/Users/patrickhess/Downloads/test_users.csv")
+
+Ypred = model.predict(X)
+
+# get top 5 indexes
+def get_indexes_top_5(ypred):
+    indexes = []
+    for pos in range(len(ypred)):
+        ar = []
+        pred = ypred[pos]
+        sorted_indexes = numpy.argsort(pred)[::-1][:5]
+        for j in range(5):
+            ar.append(sorted_indexes[j])
+        indexes.append(ar)
+    return indexes
+    
+def accuracy_top_5(ground_truth, predictions):
+    correct = 0
+    for i in range(len(ground_truth)):
+        for j in range(5):
+            correct += ground_truth[i][predictions[i][j]]
+            return correct / len(ground_truth)
+
+indexes = get_indexes_top_5(Ypred)
+accuracy_top_5(Y, indexes)
+    
 
 Xtest = []
 ids = []
@@ -133,8 +158,6 @@ for it, row in raw_train.iterrows():
                   'affiliate_provider': 'unknown'  if (str(row['affiliate_provider']) == 'nan') else row['affiliate_provider'],
                   'first_affiliate_tracked': 'unknown' if (str(row['first_affiliate_tracked']) == 'nan') else row['first_affiliate_tracked'],
                   'signup_app': 'unknown' if (str(row['signup_app']) == 'nan') else row['signup_app'],
-                  'first_device_type': 'unknown' if (str(row['first_device_type']) == 'nan') else row['first_device_type'],
-                  'first_browser': 'unknown' if (str(row['first_browser']) == 'nan') else row['first_browser'],
                   'month_first_booking': 'unknown' if (str(row['date_first_booking']) == 'nan') else str(parse(row['date_first_booking']).month) 
                   }
     ids.append(row['id'])
@@ -144,17 +167,18 @@ Xtest = dctX.transform(Xtest)
 Ypred = model.predict(Xtest)
 output = []
 
-countries = [c.split("=")[1] for c in dctY.get_feature_names()]
+countries = [c.split("=")[1].strip() for c in dctY.get_feature_names()]
 
 with gzip.open('airbnb.csv.gz', 'wt') as outf:
-  fo = csv.writer(outf, lineterminator='\n')
-  fo.writerow(['Id'] + ['Country'])
-  pos = 0
-  for pos in range(len(Ypred)):
-    pred = Ypred[pos]
-    sorted_indexes = numpy.argsort(pred)[::-1][:5]
-    idd = ids[pos]
-    for i in range(5):
-      fo.writerow([idd] + [countries[sorted_indexes[i]]])
+    fo = csv.writer(outf, lineterminator='\n')
+    fo.writerow(['Id'] + ['Country'])
+    pos = 0
+    for pos in range(len(Ypred)):
+        pred = Ypred[pos]
+        sorted_indexes = numpy.argsort(pred)[::-1][:5]
+        idd = ids[pos]
+        for i in range(5):
+            fo.writerow([idd] + [countries[sorted_indexes[i]]])
         
-
+        
+        

@@ -95,8 +95,7 @@ def build_model(input_dim, output_dim, hn=64, dp=0.5, layers=1):
         model.add(PReLU(input_shape=(hn,)))
         model.add(BatchNormalization(input_shape=(hn,)))
         model.add(Dropout(dp))
-
-    model.add(Dense(input_dim=hn, output_dim=output_dim, init='glorot_uniform')
+        model.add(Dense(input_dim=hn, output_dim=output_dim, init='glorot_uniform'))
     model.add(Activation('softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
